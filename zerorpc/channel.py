@@ -22,11 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import gevent.pool
-import gevent.queue
-import gevent.event
-import gevent.local
-import gevent.lock
+import eventlet
 import logging
 
 from .exceptions import TimeoutExpired
@@ -43,8 +39,8 @@ class ChannelMultiplexer(ChannelBase):
         self._channel_dispatcher_task = None
         self._broadcast_queue = None
         if events.recv_is_supported and not ignore_broadcast:
-            self._broadcast_queue = gevent.queue.Queue(maxsize=1)
-            self._channel_dispatcher_task = gevent.spawn(
+            self._broadcast_queue = eventlet.queue.Queue(maxsize=1)
+            self._channel_dispatcher_task = eventlet.spawn(
                 self._channel_dispatcher)
 
     @property
@@ -98,7 +94,7 @@ class ChannelMultiplexer(ChannelBase):
 
     def channel(self, from_event=None):
         if self._channel_dispatcher_task is None:
-            self._channel_dispatcher_task = gevent.spawn(
+            self._channel_dispatcher_task = eventlet.spawn(
                 self._channel_dispatcher)
         return Channel(self, from_event)
 
@@ -117,7 +113,7 @@ class Channel(ChannelBase):
         self._multiplexer = multiplexer
         self._channel_id = None
         self._zmqid = None
-        self._queue = gevent.queue.Queue(maxsize=1)
+        self._queue = eventlet.queue.Queue(maxsize=1)
         if from_event is not None:
             self._channel_id = from_event.header[u'message_id']
             self._zmqid = from_event.identity
@@ -156,7 +152,7 @@ class Channel(ChannelBase):
     def recv(self, timeout=None):
         try:
             event = self._queue.get(timeout=timeout)
-        except gevent.queue.Empty:
+        except eventlet.queue.Empty:
             raise TimeoutExpired(timeout)
         return event
 
@@ -172,11 +168,11 @@ class BufferedChannel(ChannelBase):
         self._input_queue_size = inqueue_size
         self._remote_queue_open_slots = 1
         self._input_queue_reserved = 1
-        self._remote_can_recv = gevent.event.Event()
-        self._input_queue = gevent.queue.Queue()
+        self._remote_can_recv = eventlet.event.Event()
+        self._input_queue = eventlet.queue.Queue()
         self._verbose = False
         self._on_close_if = None
-        self._recv_task = gevent.spawn(self._recver)
+        self._recv_task = eventlet.spawn(self._recver)
 
     @property
     def recv_is_supported(self):
@@ -211,7 +207,7 @@ class BufferedChannel(ChannelBase):
                 except Exception:
                     logger.exception('gevent_zerorpc.BufferedChannel._recver')
                 if self._remote_queue_open_slots > 0:
-                    self._remote_can_recv.set()
+                    self._remote_can_recv.send()
             elif self._input_queue.qsize() == self._input_queue_size:
                 raise RuntimeError(
                     'BufferedChannel, queue overflow on event:', event)
@@ -227,12 +223,12 @@ class BufferedChannel(ChannelBase):
 
     def emit_event(self, event, timeout=None):
         if self._remote_queue_open_slots == 0:
-            self._remote_can_recv.clear()
+            # self._remote_can_recv.reset()  # TODO Check if the result is equivalent to gevent.clear()
             self._remote_can_recv.wait(timeout=timeout)
         self._remote_queue_open_slots -= 1
         try:
             self._channel.emit_event(event)
-        except:
+        except Exception:
             self._remote_queue_open_slots += 1
             raise
 
@@ -253,7 +249,7 @@ class BufferedChannel(ChannelBase):
 
         try:
             event = self._input_queue.get(timeout=timeout)
-        except gevent.queue.Empty:
+        except eventlet.queue.Empty:
             raise TimeoutExpired(timeout)
 
         self._input_queue_reserved -= 1

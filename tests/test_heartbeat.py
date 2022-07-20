@@ -28,7 +28,7 @@ from __future__ import absolute_import
 from builtins import range
 
 import pytest
-import gevent
+import eventlet
 import sys
 
 from zerorpc import zmq
@@ -55,7 +55,7 @@ def test_close_server_hbchan():
     server_hbchan = zerorpc.HeartBeatOnChannel(server_channel, freq=TIME_FACTOR * 2)
     server_hbchan.recv()
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE SERVER SOCKET!!!')
     server_hbchan.close()
     if sys.version_info < (2, 7):
@@ -88,7 +88,7 @@ def test_close_client_hbchan():
     server_hbchan = zerorpc.HeartBeatOnChannel(server_channel, freq=TIME_FACTOR * 2)
     server_hbchan.recv()
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE CLIENT SOCKET!!!')
     client_hbchan.close()
     if sys.version_info < (2, 7):
@@ -119,7 +119,7 @@ def test_heartbeat_can_open_channel_server_close():
     server_channel = server.channel(event)
     server_hbchan = zerorpc.HeartBeatOnChannel(server_channel, freq=TIME_FACTOR * 2)
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE SERVER SOCKET!!!')
     server_hbchan.close()
     if sys.version_info < (2, 7):
@@ -150,7 +150,7 @@ def test_heartbeat_can_open_channel_client_close():
     server_channel = server.channel(event)
     server_hbchan = zerorpc.HeartBeatOnChannel(server_channel, freq=TIME_FACTOR * 2)
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE CLIENT SOCKET!!!')
     client_hbchan.close()
     client.close()
@@ -189,7 +189,7 @@ def test_do_some_req_rep():
             assert list(event.args) == [x + x * x]
         client_hbchan.close()
 
-    client_task = gevent.spawn(client_do)
+    client_task = eventlet.spawn(client_do)
 
     def server_do():
         for x in range(20):
@@ -198,10 +198,10 @@ def test_do_some_req_rep():
             server_hbchan.emit('OK', (sum(event.args),))
         server_hbchan.close()
 
-    server_task = gevent.spawn(server_do)
+    server_task = eventlet.spawn(server_do)
 
-    server_task.get()
-    client_task.get()
+    server_task.wait()
+    client_task.wait()
     client.close()
     server.close()
 
@@ -233,7 +233,7 @@ def test_do_some_req_rep_lost_server():
                 client_hbchan.recv()
         client_hbchan.close()
 
-    client_task = gevent.spawn(client_do)
+    client_task = eventlet.spawn(client_do)
 
     def server_do():
         event = server.recv()
@@ -245,10 +245,10 @@ def test_do_some_req_rep_lost_server():
             server_hbchan.emit('OK', (sum(event.args),))
         server_hbchan.close()
 
-    server_task = gevent.spawn(server_do)
+    server_task = eventlet.spawn(server_do)
 
-    server_task.get()
-    client_task.get()
+    server_task.wait()
+    client_task.wait()
     client.close()
     server.close()
 
@@ -274,7 +274,7 @@ def test_do_some_req_rep_lost_client():
             assert list(event.args) == [x + x * x]
         client_hbchan.close()
 
-    client_task = gevent.spawn(client_do)
+    client_task = eventlet.spawn(client_do)
 
     def server_do():
         event = server.recv()
@@ -293,10 +293,10 @@ def test_do_some_req_rep_lost_client():
                 server_hbchan.recv()
         server_hbchan.close()
 
-    server_task = gevent.spawn(server_do)
+    server_task = eventlet.spawn(server_do)
 
-    server_task.get()
-    client_task.get()
+    server_task.wait()
+    client_task.wait()
     client.close()
     server.close()
 
@@ -332,7 +332,7 @@ def test_do_some_req_rep_client_timeout():
                     assert list(event.args) == [x]
         client_hbchan.close()
 
-    client_task = gevent.spawn(client_do)
+    client_task = eventlet.spawn(client_do)
 
     def server_do():
         event = server.recv()
@@ -344,7 +344,7 @@ def test_do_some_req_rep_client_timeout():
                 for x in range(20):
                     event = server_hbchan.recv()
                     assert event.name == 'sleep'
-                    gevent.sleep(TIME_FACTOR * event.args[0])
+                    eventlet.sleep(TIME_FACTOR * event.args[0])
                     server_hbchan.emit('OK', event.args)
             pytest.raises(zerorpc.LostRemote, _do_with_assert_raises)
         else:
@@ -352,13 +352,13 @@ def test_do_some_req_rep_client_timeout():
                 for x in range(20):
                     event = server_hbchan.recv()
                     assert event.name == 'sleep'
-                    gevent.sleep(TIME_FACTOR * event.args[0])
+                    eventlet.sleep(TIME_FACTOR * event.args[0])
                     server_hbchan.emit('OK', event.args)
         server_hbchan.close()
 
-    server_task = gevent.spawn(server_do)
+    server_task = eventlet.spawn(server_do)
 
-    server_task.get()
-    client_task.get()
+    server_task.wait()
+    client_task.wait()
     client.close()
     server.close()

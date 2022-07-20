@@ -26,11 +26,13 @@
 from __future__ import print_function
 from __future__ import absolute_import
 from builtins import str
+
+import greenlet
 from future.utils import tobytes
 
 import pytest
-import gevent
-import gevent.local
+import eventlet
+import eventlet.corolocal
 import random
 import hashlib
 import sys
@@ -109,7 +111,7 @@ def test_resolve_endpoint_events():
     cnt = c.register_middleware(Resolver())
     assert cnt == 1
     srv.bind('some_service')
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(heartbeat=TIME_FACTOR * 1, context=c)
     client.connect('some_service')
@@ -123,7 +125,7 @@ class Tracer(object):
     '''Used by test_task_context_* tests'''
     def __init__(self, identity):
         self._identity = identity
-        self._locals = gevent.local.local()
+        self._locals = eventlet.corolocal.local()
         self._log = []
 
     @property
@@ -169,7 +171,7 @@ def test_task_context():
 
     srv = zerorpc.Server(Srv(), context=srv_ctx)
     srv.bind(endpoint)
-    srv_task = gevent.spawn(srv.run)
+    srv_task = eventlet.spawn(srv.run)
 
     c = zerorpc.Client(context=cli_ctx)
     c.connect(endpoint)
@@ -179,7 +181,10 @@ def test_task_context():
         assert x == 42
 
     srv.stop()
-    srv_task.join()
+    try:
+        srv_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -212,7 +217,7 @@ def test_task_context_relay():
 
     srv = zerorpc.Server(Srv(), context=srv_ctx)
     srv.bind(endpoint1)
-    srv_task = gevent.spawn(srv.run)
+    srv_task = eventlet.spawn(srv.run)
 
     c_relay = zerorpc.Client(context=srv_relay_ctx)
     c_relay.connect(endpoint1)
@@ -223,7 +228,7 @@ def test_task_context_relay():
 
     srv_relay = zerorpc.Server(SrvRelay(), context=srv_relay_ctx)
     srv_relay.bind(endpoint2)
-    srv_relay_task = gevent.spawn(srv_relay.run)
+    srv_relay_task = eventlet.spawn(srv_relay.run)
 
     c = zerorpc.Client(context=cli_ctx)
     c.connect(endpoint2)
@@ -232,8 +237,14 @@ def test_task_context_relay():
 
     srv_relay.stop()
     srv.stop()
-    srv_relay_task.join()
-    srv_task.join()
+    try:
+        srv_relay_task.wait()
+    except greenlet.GreenletExit:
+        pass
+    try:
+        srv_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -268,7 +279,7 @@ def test_task_context_relay_fork():
 
     srv = zerorpc.Server(Srv(), context=srv_ctx)
     srv.bind(endpoint1)
-    srv_task = gevent.spawn(srv.run)
+    srv_task = eventlet.spawn(srv.run)
 
     c_relay = zerorpc.Client(context=srv_relay_ctx)
     c_relay.connect(endpoint1)
@@ -277,16 +288,16 @@ def test_task_context_relay_fork():
         def echo(self, msg):
             def dothework(msg):
                 return c_relay.echo(msg) + 'relayed'
-            g = gevent.spawn(zerorpc.fork_task_context(dothework,
+            g = eventlet.spawn(zerorpc.fork_task_context(dothework,
                 srv_relay_ctx), 'relay' + msg)
             print('relaying in separate task:', g)
-            r = g.get()
+            r = g.wait()
             print('back to main task')
             return r
 
     srv_relay = zerorpc.Server(SrvRelay(), context=srv_relay_ctx)
     srv_relay.bind(endpoint2)
-    srv_relay_task = gevent.spawn(srv_relay.run)
+    srv_relay_task = eventlet.spawn(srv_relay.run)
 
     c = zerorpc.Client(context=cli_ctx)
     c.connect(endpoint2)
@@ -295,8 +306,15 @@ def test_task_context_relay_fork():
 
     srv_relay.stop()
     srv.stop()
-    srv_relay_task.join()
-    srv_task.join()
+    try:
+        srv_relay_task.wait()
+    except greenlet.GreenletExit:
+        pass
+
+    try:
+        srv_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -324,25 +342,28 @@ def test_task_context_pushpull():
     pusher_tracer = Tracer('[pusher]')
     pusher_ctx.register_middleware(pusher_tracer)
 
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Puller(object):
         def echo(self, msg):
-            trigger.set()
+            trigger.send()
 
     puller = zerorpc.Puller(Puller(), context=puller_ctx)
     puller.bind(endpoint)
-    puller_task = gevent.spawn(puller.run)
+    puller_task = eventlet.spawn(puller.run)
 
     c = zerorpc.Pusher(context=pusher_ctx)
     c.connect(endpoint)
 
-    trigger.clear()
+    # trigger.reset()
     c.echo('hello')
     trigger.wait()
 
     puller.stop()
-    puller_task.join()
+    try:
+        puller_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
     assert pusher_tracer._log == [
             ('new', pusher_tracer.trace_id),
@@ -362,29 +383,32 @@ def test_task_context_pubsub():
     publisher_tracer = Tracer('[publisher]')
     publisher_ctx.register_middleware(publisher_tracer)
 
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Subscriber(object):
         def echo(self, msg):
-            trigger.set()
+            trigger.send()
 
     subscriber = zerorpc.Subscriber(Subscriber(), context=subscriber_ctx)
     subscriber.bind(endpoint)
-    subscriber_task = gevent.spawn(subscriber.run)
+    subscriber_task = eventlet.spawn(subscriber.run)
 
     c = zerorpc.Publisher(context=publisher_ctx)
     c.connect(endpoint)
 
-    trigger.clear()
+    # trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
-    while not trigger.is_set():
+    while not trigger.ready():
         c.echo('pub...')
         if trigger.wait(TIME_FACTOR * 1):
             break
 
     subscriber.stop()
-    subscriber_task.join()
+    try:
+        subscriber_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
     print(publisher_tracer._log)
     assert ('new', publisher_tracer.trace_id) in publisher_tracer._log
@@ -429,7 +453,7 @@ def test_server_inspect_exception_middleware():
     module = Srv()
     server = zerorpc.Server(module, context=ctx)
     server.bind(endpoint)
-    gevent.spawn(server.run)
+    eventlet.spawn(server.run)
 
     client = zerorpc.Client()
     client.connect(endpoint)
@@ -447,7 +471,7 @@ def test_server_inspect_exception_middleware():
 def test_server_inspect_exception_middleware_puller():
     endpoint = random_ipc_endpoint()
 
-    barrier = gevent.event.Event()
+    barrier = eventlet.event.Event()
     middleware = InspectExceptionMiddleware(barrier)
     ctx = zerorpc.Context()
     ctx.register_middleware(middleware)
@@ -455,12 +479,12 @@ def test_server_inspect_exception_middleware_puller():
     module = Srv()
     server = zerorpc.Puller(module, context=ctx)
     server.bind(endpoint)
-    gevent.spawn(server.run)
+    eventlet.spawn(server.run)
 
     client = zerorpc.Pusher()
     client.connect(endpoint)
 
-    barrier.clear()
+    # barrier.reset()
     client.echo('This is a test which should call the InspectExceptionMiddleware')
     barrier.wait(timeout=TIME_FACTOR * 2)
 
@@ -479,7 +503,7 @@ def test_server_inspect_exception_middleware_stream():
     module = Srv()
     server = zerorpc.Server(module, context=ctx)
     server.bind(endpoint)
-    gevent.spawn(server.run)
+    eventlet.spawn(server.run)
 
     client = zerorpc.Client()
     client.connect(endpoint)

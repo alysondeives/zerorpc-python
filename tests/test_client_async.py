@@ -26,7 +26,7 @@
 from __future__ import print_function
 from __future__ import absolute_import
 import pytest
-import gevent
+import eventlet
 import sys
 
 from zerorpc import zmq
@@ -43,12 +43,12 @@ def test_client_server_client_timeout_with_async():
             return 42
 
         def add(self, a, b):
-            gevent.sleep(TIME_FACTOR * 10)
+            eventlet.sleep(TIME_FACTOR * 10)
             return a + b
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(timeout=TIME_FACTOR * 2)
     client.connect(endpoint)
@@ -57,11 +57,11 @@ def test_client_server_client_timeout_with_async():
 
     if sys.version_info < (2, 7):
         def _do_with_assert_raises():
-            print(async_result.get())
+            print(async_result.wait())
         pytest.raises(zerorpc.TimeoutExpired, _do_with_assert_raises)
     else:
         with pytest.raises(zerorpc.TimeoutExpired):
-            print(async_result.get())
+            print(async_result.wait())
     client.close()
     srv.close()
 
@@ -79,13 +79,13 @@ def test_client_server_with_async():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client()
     client.connect(endpoint)
 
     async_result = client.lolita(async_=True)
-    assert async_result.get() == 42
+    assert async_result.wait() == 42
 
     async_result = client.add(1, 4, async_=True)
-    assert async_result.get() == 5
+    assert async_result.wait() == 5

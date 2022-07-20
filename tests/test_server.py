@@ -28,7 +28,7 @@ from __future__ import absolute_import
 from builtins import range
 
 import pytest
-import gevent
+import eventlet
 import sys
 
 from zerorpc import zmq
@@ -49,7 +49,7 @@ def test_server_manual():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client_events = zerorpc.Events(zmq.DEALER)
     client_events.connect(endpoint)
@@ -82,7 +82,7 @@ def test_client_server():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client()
     client.connect(endpoint)
@@ -103,12 +103,12 @@ def test_client_server_client_timeout():
             return 42
 
         def add(self, a, b):
-            gevent.sleep(TIME_FACTOR * 10)
+            eventlet.sleep(TIME_FACTOR * 10)
             return a + b
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(timeout=TIME_FACTOR * 2)
     client.connect(endpoint)
@@ -132,7 +132,7 @@ def test_client_server_exception():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(timeout=TIME_FACTOR * 2)
     client.connect(endpoint)
@@ -159,7 +159,7 @@ def test_client_server_detailed_exception():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(timeout=TIME_FACTOR * 2)
     client.connect(endpoint)
@@ -192,7 +192,7 @@ def test_exception_compat_v1():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client_events = zerorpc.Events(zmq.DEALER)
     client_events.connect(endpoint)
@@ -215,7 +215,7 @@ def test_exception_compat_v1():
     assert event.name == 'ERR'
     (msg,) = event.args
     print('msg only', msg)
-    assert msg == "NameError('donotexist',)"
+    assert msg == "NameError('donotexist')"
 
     client_events.close()
     srv.close()

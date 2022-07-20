@@ -24,11 +24,7 @@
 
 
 import time
-import gevent.pool
-import gevent.queue
-import gevent.event
-import gevent.local
-import gevent.lock
+import eventlet
 
 from .exceptions import LostRemote, TimeoutExpired
 from .channel_base import ChannelBase
@@ -40,12 +36,12 @@ class HeartBeatOnChannel(ChannelBase):
         self._closed = False
         self._channel = channel
         self._heartbeat_freq = freq
-        self._input_queue = gevent.queue.Channel()
+        self._input_queue = eventlet.queue.Queue(maxsize=0)  # Channel
         self._remote_last_hb = None
         self._lost_remote = False
-        self._recv_task = gevent.spawn(self._recver)
+        self._recv_task = eventlet.spawn(self._recver)
         self._heartbeat_task = None
-        self._parent_coroutine = gevent.getcurrent()
+        self._parent_coroutine = eventlet.getcurrent()
         self._compat_v2 = None
         if not passive:
             self._start_heartbeat()
@@ -72,20 +68,20 @@ class HeartBeatOnChannel(ChannelBase):
 
     def _heartbeat(self):
         while True:
-            gevent.sleep(self._heartbeat_freq)
+            eventlet.sleep(self._heartbeat_freq)
             if self._remote_last_hb is None:
                 self._remote_last_hb = time.time()
             if time.time() > self._remote_last_hb + self._heartbeat_freq * 2:
                 self._lost_remote = True
                 if not self._closed:
-                    gevent.kill(self._parent_coroutine,
+                    eventlet.kill(self._parent_coroutine,
                             self._lost_remote_exception())
                 break
             self._channel.emit(u'_zpc_hb', (0,))  # 0 -> compat with protocol v2
 
     def _start_heartbeat(self):
         if self._heartbeat_task is None and self._heartbeat_freq is not None and not self._closed:
-            self._heartbeat_task = gevent.spawn(self._heartbeat)
+            self._heartbeat_task = eventlet.spawn(self._heartbeat)
 
     def _recver(self):
         while True:
@@ -120,7 +116,7 @@ class HeartBeatOnChannel(ChannelBase):
             raise self._lost_remote_exception()
         try:
             return self._input_queue.get(timeout=timeout)
-        except gevent.queue.Empty:
+        except eventlet.queue.Empty:
             raise TimeoutExpired(timeout)
 
     @property

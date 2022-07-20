@@ -28,15 +28,12 @@ from builtins import str
 from builtins import range
 
 import msgpack
-import gevent.pool
-import gevent.queue
-import gevent.event
-import gevent.local
-import gevent.lock
+import eventlet
+import greenlet
 import logging
 import sys
 
-from . import gevent_zmq as zmq
+from eventlet.green import zmq
 from .exceptions import TimeoutExpired
 from .context import Context
 from .channel_base import ChannelBase
@@ -50,8 +47,8 @@ else:
         return frame.buffer
 
 # gevent <= 1.1.0.rc5 is missing the Python3 __next__ method.
-if sys.version_info >= (3, 0) and gevent.version_info <= (1, 1, 0, 'rc', '5'):
-    setattr(gevent.queue.Channel, '__next__', gevent.queue.Channel.next)
+# if sys.version_info >= (3, 0) and gevent.version_info <= (1, 1, 0, 'rc', '5'):
+#     setattr(gevent.queue.Channel, '__next__', gevent.queue.Channel.next)
 
 
 logger = logging.getLogger(__name__)
@@ -67,20 +64,20 @@ class SequentialSender(object):
         for i in range(len(parts) - 1):
             try:
                 self._socket.send(parts[i], copy=False, flags=zmq.SNDMORE)
-            except (gevent.GreenletExit, gevent.Timeout) as e:
+            except (greenlet.GreenletExit, eventlet.Timeout) as e:
                 if i == 0:
                     raise
                 self._socket.send(parts[i], copy=False, flags=zmq.SNDMORE)
         try:
             self._socket.send(parts[-1], copy=False)
-        except (gevent.GreenletExit, gevent.Timeout) as e:
+        except (greenlet.GreenletExit, eventlet.Timeout) as e:
             self._socket.send(parts[-1], copy=False)
         if e:
             raise e
 
     def __call__(self, parts, timeout=None):
         if timeout:
-            with gevent.Timeout(timeout):
+            with eventlet.Timeout(timeout):
                 self._send(parts)
         else:
             self._send(parts)
@@ -97,7 +94,7 @@ class SequentialReceiver(object):
         while True:
             try:
                 part = self._socket.recv(copy=False)
-            except (gevent.GreenletExit, gevent.Timeout) as e:
+            except (greenlet.GreenletExit, eventlet.Timeout) as e:
                 if len(parts) == 0:
                     raise
                 part = self._socket.recv(copy=False)
@@ -110,7 +107,7 @@ class SequentialReceiver(object):
 
     def __call__(self, timeout=None):
         if timeout:
-            with gevent.Timeout(timeout):
+            with eventlet.Timeout(timeout):
                 return self._recv()
         else:
             return self._recv()
@@ -120,21 +117,22 @@ class Sender(SequentialSender):
 
     def __init__(self, socket):
         self._socket = socket
-        self._send_queue = gevent.queue.Channel()
-        self._send_task = gevent.spawn(self._sender)
+        self._send_queue = eventlet.queue.Queue(maxsize=0)  # Channel
+        self._send_task = eventlet.spawn(self._sender)
 
     def close(self):
         if self._send_task:
             self._send_task.kill()
 
     def _sender(self):
-        for parts in self._send_queue:
+        while True:
+            parts = self._send_queue.get()
             super(Sender, self)._send(parts)
 
     def __call__(self, parts, timeout=None):
         try:
             self._send_queue.put(parts, timeout=timeout)
-        except gevent.queue.Full:
+        except eventlet.queue.Full:
             raise TimeoutExpired(timeout)
 
 
@@ -142,8 +140,8 @@ class Receiver(SequentialReceiver):
 
     def __init__(self, socket):
         self._socket = socket
-        self._recv_queue = gevent.queue.Channel()
-        self._recv_task = gevent.spawn(self._recver)
+        self._recv_queue = eventlet.queue.Queue(maxsize=0)  # Channel
+        self._recv_task = eventlet.spawn(self._recver)
 
     def close(self):
         if self._recv_task:
@@ -158,7 +156,7 @@ class Receiver(SequentialReceiver):
     def __call__(self, timeout=None):
         try:
             return self._recv_queue.get(timeout=timeout)
-        except gevent.queue.Empty:
+        except eventlet.queue.Empty:
             raise TimeoutExpired(timeout)
 
 
@@ -281,11 +279,11 @@ class Events(ChannelBase):
     def close(self):
         try:
             self._send.close()
-        except (AttributeError, TypeError, gevent.GreenletExit):
+        except (AttributeError, TypeError, greenlet.GreenletExit):
             pass
         try:
             self._recv.close()
-        except (AttributeError, TypeError, gevent.GreenletExit):
+        except (AttributeError, TypeError, greenlet.GreenletExit):
             pass
         self._socket.close()
 

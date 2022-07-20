@@ -27,7 +27,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from builtins import range
 
-import gevent
+import eventlet
 
 import zerorpc
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -55,7 +55,7 @@ def test_rcp_streaming():
 
     srv = MySrv(heartbeat=TIME_FACTOR * 4)
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(heartbeat=TIME_FACTOR * 4)
     client.connect(endpoint)
@@ -67,7 +67,7 @@ def test_rcp_streaming():
     assert isinstance(r, Iterator)
     l = []
     print('wait 4s for fun')
-    gevent.sleep(TIME_FACTOR * 4)
+    eventlet.sleep(TIME_FACTOR * 4)
     for x in r:
         l.append(x)
     assert l == list(range(10))

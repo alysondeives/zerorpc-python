@@ -24,7 +24,7 @@
 
 
 from __future__ import absolute_import
-import gevent
+import eventlet
 
 import zerorpc
 from .testutils import teardown, random_ipc_endpoint
@@ -39,7 +39,7 @@ def test_client_connect():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client()
     client.connect(endpoint)
@@ -56,7 +56,7 @@ def test_client_quick_connect():
 
     srv = MySrv()
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(endpoint)
 

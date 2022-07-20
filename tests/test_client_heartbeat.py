@@ -28,7 +28,7 @@ from __future__ import absolute_import
 from builtins import next
 from builtins import range
 
-import gevent
+import eventlet
 
 import zerorpc
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -43,11 +43,11 @@ def test_client_server_hearbeat():
             return 42
 
         def slow(self):
-            gevent.sleep(TIME_FACTOR * 10)
+            eventlet.sleep(TIME_FACTOR * 10)
 
     srv = MySrv(heartbeat=TIME_FACTOR * 1)
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client = zerorpc.Client(heartbeat=TIME_FACTOR * 1)
     client.connect(endpoint)
@@ -62,13 +62,13 @@ def test_client_server_activate_heartbeat():
     class MySrv(zerorpc.Server):
 
         def lolita(self):
-            gevent.sleep(TIME_FACTOR * 3)
+            eventlet.sleep(TIME_FACTOR * 3)
             return 42
 
     srv = MySrv(heartbeat=TIME_FACTOR * 4)
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
-    gevent.sleep(0)
+    eventlet.spawn(srv.run)
+    eventlet.sleep(0)
 
     client = zerorpc.Client(heartbeat=TIME_FACTOR * 4)
     client.connect(endpoint)
@@ -86,13 +86,13 @@ def test_client_server_passive_hearbeat():
             return 42
 
         def slow(self):
-            gevent.sleep(TIME_FACTOR * 3)
+            eventlet.sleep(TIME_FACTOR * 3)
             return 2
 
     srv = MySrv(heartbeat=TIME_FACTOR * 4)
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
-    gevent.sleep(0)
+    eventlet.spawn(srv.run)
+    eventlet.sleep(0)
 
     client = zerorpc.Client(heartbeat=TIME_FACTOR * 4, passive_heartbeat=True)
     client.connect(endpoint)
@@ -112,16 +112,16 @@ def test_client_hb_doesnt_linger_on_streaming():
 
     srv = MySrv(heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client1 = zerorpc.Client(endpoint, heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
 
     def test_client():
         assert list(client1.iter()) == list(range(42))
         print('sleep 3s')
-        gevent.sleep(TIME_FACTOR * 3)
+        eventlet.sleep(TIME_FACTOR * 3)
 
-    gevent.spawn(test_client).join()
+    eventlet.spawn(test_client).wait()
 
 
 def est_client_drop_few():
@@ -134,7 +134,7 @@ def est_client_drop_few():
 
     srv = MySrv(heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client1 = zerorpc.Client(endpoint, heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
     client2 = zerorpc.Client(endpoint, heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
@@ -143,7 +143,7 @@ def est_client_drop_few():
     assert client1.lolita() == 42
     assert client2.lolita() == 42
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     assert client3.lolita() == 42
 
 
@@ -158,7 +158,7 @@ def test_client_drop_empty_stream():
 
     srv = MySrv(heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client1 = zerorpc.Client(endpoint, heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
 
@@ -167,9 +167,9 @@ def test_client_drop_empty_stream():
         i = client1.iter()
 
         print('sleep 3s')
-        gevent.sleep(TIME_FACTOR * 3)
+        eventlet.sleep(TIME_FACTOR * 3)
 
-    gevent.spawn(test_client).join()
+    eventlet.spawn(test_client).wait()
 
 
 def test_client_drop_stream():
@@ -183,7 +183,7 @@ def test_client_drop_stream():
 
     srv = MySrv(heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
     srv.bind(endpoint)
-    gevent.spawn(srv.run)
+    eventlet.spawn(srv.run)
 
     client1 = zerorpc.Client(endpoint, heartbeat=TIME_FACTOR * 1, context=zerorpc.Context())
 
@@ -195,6 +195,6 @@ def test_client_drop_stream():
         assert list(next(i) for x in range(142)) == list(range(142))
 
         print('sleep 3s')
-        gevent.sleep(TIME_FACTOR * 3)
+        eventlet.sleep(TIME_FACTOR * 3)
 
-    gevent.spawn(test_client).join()
+    eventlet.spawn(test_client).wait()

@@ -30,13 +30,9 @@ from future.utils import iteritems
 
 import sys
 import traceback
-import gevent.pool
-import gevent.queue
-import gevent.event
-import gevent.local
-import gevent.lock
+import eventlet
 
-from . import gevent_zmq as zmq
+from eventlet.green import zmq
 from .exceptions import TimeoutExpired, RemoteError, LostRemote
 from .channel import ChannelMultiplexer, BufferedChannel
 from .socket import SocketBase
@@ -52,7 +48,7 @@ logger = getLogger(__name__)
 class ServerBase(object):
 
     def __init__(self, channel, methods=None, name=None, context=None,
-            pool_size=None, heartbeat=5):
+            pool_size=1000, heartbeat=5):
         self._multiplexer = ChannelMultiplexer(channel)
 
         if methods is None:
@@ -60,7 +56,7 @@ class ServerBase(object):
 
         self._context = context or Context.get_instance()
         self._name = name or self._extract_name()
-        self._task_pool = gevent.pool.Pool(size=pool_size)
+        self._task_pool = eventlet.greenpool.GreenPool(size=pool_size)
         self._acceptor_task = None
         self._methods = self._filter_methods(ServerBase, self, methods)
 
@@ -171,12 +167,12 @@ class ServerBase(object):
             self._task_pool.spawn(self._async_task, initial_event)
 
     def run(self):
-        self._acceptor_task = gevent.spawn(self._acceptor)
+        self._acceptor_task = eventlet.spawn(self._acceptor)
         try:
-            self._acceptor_task.get()
+            self._acceptor_task.wait()
         finally:
             self.stop()
-            self._task_pool.join(raise_error=True)
+            self._task_pool.waitall()
 
     def stop(self):
         if self._acceptor_task is not None:
@@ -272,10 +268,8 @@ class ClientBase(object):
             kargs.get('async_', False) is False):
             return self._process_response(request_event, bufchan, timeout)
 
-        async_result = gevent.event.AsyncResult()
-        gevent.spawn(self._process_response, request_event, bufchan,
-                timeout).link(async_result)
-        return async_result
+        return eventlet.spawn(self._process_response, request_event, bufchan,
+                timeout)
 
     def __getattr__(self, method):
         return lambda *args, **kargs: self(method, *args, **kargs)
@@ -283,7 +277,7 @@ class ClientBase(object):
 
 class Server(SocketBase, ServerBase):
 
-    def __init__(self, methods=None, name=None, context=None, pool_size=None,
+    def __init__(self, methods=None, name=None, context=None, pool_size=1000,
             heartbeat=5):
         SocketBase.__init__(self, zmq.ROUTER, context)
         if methods is None:
@@ -368,15 +362,15 @@ class Puller(SocketBase):
                     del exc_infos
 
     def run(self):
-        self._receiver_task = gevent.spawn(self._receiver)
+        self._receiver_task = eventlet.spawn(self._receiver)
         try:
-            self._receiver_task.get()
+            self._receiver_task.wait()
         finally:
             self._receiver_task = None
 
     def stop(self):
         if self._receiver_task is not None:
-            self._receiver_task.kill(block=False)
+            self._receiver_task.kill()
 
 
 class Publisher(Pusher):

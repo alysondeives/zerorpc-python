@@ -29,7 +29,7 @@ from future.utils import tobytes
 import uuid
 import random
 
-from . import gevent_zmq as zmq
+from eventlet.green import zmq
 
 
 class Context(zmq.Context):

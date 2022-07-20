@@ -25,7 +25,9 @@
 from __future__ import absolute_import
 from builtins import range
 
-import gevent
+import eventlet
+import greenlet
+
 import zerorpc
 
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -62,7 +64,7 @@ class EchoModule(object):
 
     def timeout(self, msg):
         self.last_msg = "timeout: " + msg
-        gevent.sleep(TIME_FACTOR * 2)
+        eventlet.sleep(TIME_FACTOR * 2)
 
 def test_hook_client_before_request():
 
@@ -78,7 +80,7 @@ def test_hook_client_before_request():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -93,7 +95,10 @@ def test_hook_client_before_request():
     assert test_middleware.method == 'echo'
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 class ClientAfterRequestMiddleware(object):
     def __init__(self):
@@ -111,7 +116,7 @@ def test_hook_client_after_request():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -126,7 +131,10 @@ def test_hook_client_after_request():
     assert test_middleware.retcode == 'OK'
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_after_request_stream():
     zero_ctx = zerorpc.Context()
@@ -134,7 +142,7 @@ def test_hook_client_after_request_stream():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -156,7 +164,10 @@ def test_hook_client_after_request_stream():
     assert test_middleware.retcode == 'STREAM_DONE'
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_after_request_timeout():
 
@@ -176,7 +187,7 @@ def test_hook_client_after_request_timeout():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(timeout=TIME_FACTOR * 1, context=zero_ctx)
     test_client.connect(endpoint)
@@ -189,7 +200,10 @@ def test_hook_client_after_request_timeout():
         assert "timeout" in ex.args[0]
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 class ClientAfterFailedRequestMiddleware(object):
     def __init__(self):
@@ -212,7 +226,7 @@ def test_hook_client_after_request_remote_error():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(timeout=TIME_FACTOR * 1, context=zero_ctx)
     test_client.connect(endpoint)
@@ -224,7 +238,10 @@ def test_hook_client_after_request_remote_error():
         assert test_middleware.called == True
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_after_request_remote_error_stream():
 
@@ -235,7 +252,7 @@ def test_hook_client_after_request_remote_error_stream():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(timeout=TIME_FACTOR * 1, context=zero_ctx)
     test_client.connect(endpoint)
@@ -247,7 +264,10 @@ def test_hook_client_after_request_remote_error_stream():
         assert test_middleware.called == True
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_handle_remote_error_inspect():
 
@@ -264,7 +284,7 @@ def test_hook_client_handle_remote_error_inspect():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -277,7 +297,10 @@ def test_hook_client_handle_remote_error_inspect():
         assert ex.name == "RuntimeError"
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 # This is a seriously broken idea, but possible nonetheless
 class ClientEvalRemoteErrorMiddleware(object):
@@ -298,7 +321,7 @@ def test_hook_client_handle_remote_error_eval():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -311,7 +334,10 @@ def test_hook_client_handle_remote_error_eval():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_handle_remote_error_eval_stream():
     test_middleware = ClientEvalRemoteErrorMiddleware()
@@ -321,7 +347,7 @@ def test_hook_client_handle_remote_error_eval_stream():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -334,7 +360,10 @@ def test_hook_client_handle_remote_error_eval_stream():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_client_after_request_custom_error():
 
@@ -360,7 +389,7 @@ def test_hook_client_after_request_custom_error():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
 
     test_client = zerorpc.Client(context=zero_ctx)
     test_client.connect(endpoint)
@@ -373,4 +402,7 @@ def test_hook_client_after_request_custom_error():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass

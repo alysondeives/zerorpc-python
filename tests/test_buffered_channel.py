@@ -28,7 +28,7 @@ from __future__ import absolute_import
 from builtins import range
 
 import pytest
-import gevent
+import eventlet
 import sys
 
 from zerorpc import zmq
@@ -57,7 +57,7 @@ def test_close_server_bufchan():
     server_bufchan = zerorpc.BufferedChannel(server_hbchan)
     server_bufchan.recv()
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE SERVER SOCKET!!!')
     server_bufchan.close()
     if sys.version_info < (2, 7):
@@ -92,7 +92,7 @@ def test_close_client_bufchan():
     server_bufchan = zerorpc.BufferedChannel(server_hbchan)
     server_bufchan.recv()
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE CLIENT SOCKET!!!')
     client_bufchan.close()
     if sys.version_info < (2, 7):
@@ -125,7 +125,7 @@ def test_heartbeat_can_open_channel_server_close():
     server_hbchan = zerorpc.HeartBeatOnChannel(server_channel, freq=TIME_FACTOR * 2)
     server_bufchan = zerorpc.BufferedChannel(server_hbchan)
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE SERVER SOCKET!!!')
     server_bufchan.close()
     if sys.version_info < (2, 7):
@@ -160,12 +160,12 @@ def test_heartbeat_can_open_channel_client_close():
         server_bufchan = zerorpc.BufferedChannel(server_hbchan)
         try:
             while True:
-                gevent.sleep(1)
+                eventlet.sleep(1)
         finally:
             server_bufchan.close()
-    server_coro = gevent.spawn(server_fn)
+    server_coro = eventlet.spawn(server_fn)
 
-    gevent.sleep(TIME_FACTOR * 3)
+    eventlet.sleep(TIME_FACTOR * 3)
     print('CLOSE CLIENT SOCKET!!!')
     client_bufchan.close()
     client.close()
@@ -173,7 +173,7 @@ def test_heartbeat_can_open_channel_client_close():
         pytest.raises(zerorpc.LostRemote, server_coro.get)
     else:
         with pytest.raises(zerorpc.LostRemote):
-            server_coro.get()
+            server_coro.wait()
     print('SERVER LOST CLIENT :)')
     server.close()
 
@@ -200,7 +200,7 @@ def test_do_some_req_rep():
             assert list(event.args) == [x + x * x]
         client_bufchan.close()
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     coro_pool.spawn(client_do)
 
     def server_do():
@@ -217,7 +217,7 @@ def test_do_some_req_rep():
 
     coro_pool.spawn(server_do)
 
-    coro_pool.join()
+    coro_pool.waitall()
     client.close()
     server.close()
 
@@ -250,7 +250,7 @@ def test_do_some_req_rep_lost_server():
                 client_bufchan.recv()
         client_bufchan.close()
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     coro_pool.spawn(client_do)
 
     def server_do():
@@ -266,7 +266,7 @@ def test_do_some_req_rep_lost_server():
 
     coro_pool.spawn(server_do)
 
-    coro_pool.join()
+    coro_pool.waitall()
     client.close()
     server.close()
 
@@ -293,7 +293,7 @@ def test_do_some_req_rep_lost_client():
             assert list(event.args) == [x + x * x]
         client_bufchan.close()
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     coro_pool.spawn(client_do)
 
     def server_do():
@@ -316,7 +316,7 @@ def test_do_some_req_rep_lost_client():
 
     coro_pool.spawn(server_do)
 
-    coro_pool.join()
+    coro_pool.waitall()
     client.close()
     server.close()
 
@@ -353,7 +353,7 @@ def test_do_some_req_rep_client_timeout():
                     assert list(event.args) == [x]
         client_bufchan.close()
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     coro_pool.spawn(client_do)
 
     def server_do():
@@ -367,7 +367,7 @@ def test_do_some_req_rep_client_timeout():
                 for x in range(20):
                     event = server_bufchan.recv()
                     assert event.name == 'sleep'
-                    gevent.sleep(TIME_FACTOR * event.args[0])
+                    eventlet.sleep(TIME_FACTOR * event.args[0])
                     server_bufchan.emit('OK', event.args)
             pytest.raises(zerorpc.LostRemote, _do_with_assert_raises)
         else:
@@ -375,14 +375,14 @@ def test_do_some_req_rep_client_timeout():
                 for x in range(20):
                     event = server_bufchan.recv()
                     assert event.name == 'sleep'
-                    gevent.sleep(TIME_FACTOR * event.args[0])
+                    eventlet.sleep(TIME_FACTOR * event.args[0])
                     server_bufchan.emit('OK', event.args)
         server_bufchan.close()
 
 
     coro_pool.spawn(server_do)
 
-    coro_pool.join()
+    coro_pool.waitall()
     client.close()
     server.close()
 
@@ -410,7 +410,7 @@ def test_congestion_control_server_pushing():
             read_cnt.value += 1
         client_bufchan.close()
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     coro_pool.spawn(client_do)
 
     def server_do():
@@ -443,7 +443,7 @@ def test_congestion_control_server_pushing():
 
     coro_pool.spawn(server_do)
     try:
-        coro_pool.join()
+        coro_pool.waitall()
     except zerorpc.LostRemote:
         pass
     finally:
@@ -485,7 +485,7 @@ def test_on_close_if():
             if event.name == 'done':
                 return
             seen.append(event.args)
-            gevent.sleep(0.1)
+            eventlet.sleep(0.1)
 
     def server_do():
         for i in range(0, 10):
@@ -494,12 +494,12 @@ def test_on_close_if():
 
     client_bufchan.on_close_if = is_stream_done
 
-    coro_pool = gevent.pool.Pool()
+    coro_pool = eventlet.greenpool.GreenPool()
     g1 = coro_pool.spawn(client_do)
     g2 = coro_pool.spawn(server_do)
 
-    g1.get()  # Re-raise any exceptions...
-    g2.get()
+    g1.wait()  # Re-raise any exceptions...
+    g2.wait()
 
     assert seen == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 

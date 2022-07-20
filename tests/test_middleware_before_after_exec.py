@@ -25,7 +25,9 @@
 from __future__ import absolute_import
 from builtins import range
 
-import gevent
+import eventlet
+import greenlet
+
 import zerorpc
 
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -39,7 +41,7 @@ class EchoModule(object):
     def echo(self, msg):
         self.last_msg = 'echo: ' + msg
         if self._trigger:
-            self._trigger.set()
+            self._trigger.send()
         return self.last_msg
 
     @zerorpc.stream
@@ -63,7 +65,7 @@ def test_hook_server_before_exec():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -78,17 +80,20 @@ def test_hook_server_before_exec():
     assert test_middleware.called == True
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_before_exec_puller():
     zero_ctx = zerorpc.Context()
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
     endpoint = random_ipc_endpoint()
 
     echo_module = EchoModule(trigger)
     test_server = zerorpc.Puller(echo_module, context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Pusher()
     test_client.connect(endpoint)
 
@@ -96,7 +101,7 @@ def test_hook_server_before_exec_puller():
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    trigger.clear()
+    # trigger.reset()
 
     # Test with a middleware
     test_middleware = ServerBeforeExecMiddleware()
@@ -108,7 +113,10 @@ def test_hook_server_before_exec_puller():
     assert test_middleware.called == True
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_before_exec_stream():
     zero_ctx = zerorpc.Context()
@@ -116,7 +124,7 @@ def test_hook_server_before_exec_stream():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -135,7 +143,10 @@ def test_hook_server_before_exec_stream():
         assert echo == "echo: test"
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 class ServerAfterExecMiddleware(object):
 
@@ -153,7 +164,7 @@ def test_hook_server_after_exec():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -170,17 +181,20 @@ def test_hook_server_after_exec():
     assert test_middleware.reply_event_name == 'OK'
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_after_exec_puller():
     zero_ctx = zerorpc.Context()
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
     endpoint = random_ipc_endpoint()
 
     echo_module = EchoModule(trigger)
     test_server = zerorpc.Puller(echo_module, context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Pusher()
     test_client.connect(endpoint)
 
@@ -188,7 +202,7 @@ def test_hook_server_after_exec_puller():
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    trigger.clear()
+    # trigger.reset()
 
     # Test with a middleware
     test_middleware = ServerAfterExecMiddleware()
@@ -202,7 +216,10 @@ def test_hook_server_after_exec_puller():
     assert test_middleware.reply_event_name is None
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_after_exec_stream():
     zero_ctx = zerorpc.Context()
@@ -210,7 +227,7 @@ def test_hook_server_after_exec_stream():
 
     test_server = zerorpc.Server(EchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -232,7 +249,10 @@ def test_hook_server_after_exec_stream():
     assert test_middleware.reply_event_name == 'STREAM_DONE'
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 class BrokenEchoModule(object):
 
@@ -246,7 +266,7 @@ class BrokenEchoModule(object):
             raise RuntimeError("BrokenEchoModule")
         finally:
             if self._trigger:
-                self._trigger.set()
+                self._trigger.send()
 
     @zerorpc.stream
     def echoes(self, msg):
@@ -258,7 +278,7 @@ def test_hook_server_after_exec_on_error():
 
     test_server = zerorpc.Server(BrokenEchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -272,17 +292,20 @@ def test_hook_server_after_exec_on_error():
     assert test_middleware.called == False
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_after_exec_on_error_puller():
     zero_ctx = zerorpc.Context()
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
     endpoint = random_ipc_endpoint()
 
     echo_module = BrokenEchoModule(trigger)
     test_server = zerorpc.Puller(echo_module, context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Pusher()
     test_client.connect(endpoint)
 
@@ -298,7 +321,10 @@ def test_hook_server_after_exec_on_error_puller():
     assert test_middleware.called == False
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass
 
 def test_hook_server_after_exec_on_error_stream():
     zero_ctx = zerorpc.Context()
@@ -306,7 +332,7 @@ def test_hook_server_after_exec_on_error_stream():
 
     test_server = zerorpc.Server(BrokenEchoModule(), context=zero_ctx)
     test_server.bind(endpoint)
-    test_server_task = gevent.spawn(test_server.run)
+    test_server_task = eventlet.spawn(test_server.run)
     test_client = zerorpc.Client()
     test_client.connect(endpoint)
 
@@ -320,4 +346,7 @@ def test_hook_server_after_exec_on_error_stream():
     assert test_middleware.called == False
 
     test_server.stop()
-    test_server_task.join()
+    try:
+        test_server_task.wait()
+    except greenlet.GreenletExit:
+        pass

@@ -27,8 +27,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from builtins import range
 
-import gevent
-import gevent.event
+import eventlet
 import zerorpc
 
 from .testutils import teardown, random_ipc_endpoint
@@ -39,19 +38,19 @@ def test_pushpull_inheritance():
 
     pusher = zerorpc.Pusher()
     pusher.bind(endpoint)
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Puller(zerorpc.Puller):
         def lolita(self, a, b):
             print('lolita', a, b)
             assert a + b == 3
-            trigger.set()
+            trigger.send()
 
     puller = Puller()
     puller.connect(endpoint)
-    gevent.spawn(puller.run)
+    eventlet.spawn(puller.run)
 
-    trigger.clear()
+    # trigger.reset()
     pusher.lolita(1, 2)
     trigger.wait()
     print('done')
@@ -62,19 +61,19 @@ def test_pubsub_inheritance():
 
     publisher = zerorpc.Publisher()
     publisher.bind(endpoint)
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Subscriber(zerorpc.Subscriber):
         def lolita(self, a, b):
             print('lolita', a, b)
             assert a + b == 3
-            trigger.set()
+            trigger.send()
 
     subscriber = Subscriber()
     subscriber.connect(endpoint)
-    gevent.spawn(subscriber.run)
+    eventlet.spawn(subscriber.run)
 
-    trigger.clear()
+    # trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     for attempt in range(0, 10):
@@ -87,13 +86,13 @@ def test_pubsub_inheritance():
 
 def test_pushpull_composite():
     endpoint = random_ipc_endpoint()
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Puller(object):
         def lolita(self, a, b):
             print('lolita', a, b)
             assert a + b == 3
-            trigger.set()
+            trigger.send()
 
     pusher = zerorpc.Pusher()
     pusher.bind(endpoint)
@@ -101,9 +100,9 @@ def test_pushpull_composite():
     service = Puller()
     puller = zerorpc.Puller(service)
     puller.connect(endpoint)
-    gevent.spawn(puller.run)
+    eventlet.spawn(puller.run)
 
-    trigger.clear()
+    # trigger.reset()
     pusher.lolita(1, 2)
     trigger.wait()
     print('done')
@@ -111,13 +110,13 @@ def test_pushpull_composite():
 
 def test_pubsub_composite():
     endpoint = random_ipc_endpoint()
-    trigger = gevent.event.Event()
+    trigger = eventlet.event.Event()
 
     class Subscriber(object):
         def lolita(self, a, b):
             print('lolita', a, b)
             assert a + b == 3
-            trigger.set()
+            trigger.send()
 
     publisher = zerorpc.Publisher()
     publisher.bind(endpoint)
@@ -125,9 +124,9 @@ def test_pubsub_composite():
     service = Subscriber()
     subscriber = zerorpc.Subscriber(service)
     subscriber.connect(endpoint)
-    gevent.spawn(subscriber.run)
+    eventlet.spawn(subscriber.run)
 
-    trigger.clear()
+    # trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     for attempt in range(0, 10):

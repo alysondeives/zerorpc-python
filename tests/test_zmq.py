@@ -25,7 +25,7 @@
 
 from __future__ import print_function
 from __future__ import absolute_import
-import gevent
+import eventlet
 
 from zerorpc import zmq
 from .testutils import teardown, random_ipc_endpoint
@@ -61,6 +61,6 @@ def test1():
         s.close()
         c.term()
 
-    s = gevent.spawn(server)
-    c = gevent.spawn(client)
-    c.join()
+    s = eventlet.spawn(server)
+    c = eventlet.spawn(client)
+    c.wait()
