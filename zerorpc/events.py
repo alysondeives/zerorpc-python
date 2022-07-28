@@ -201,14 +201,14 @@ class Event(object):
     def identity(self, v):
         self._identity = v
 
-    def pack(self):
+    def pack(self, encoder=None):
         payload = (self._header, self._name, self._args)
-        r = msgpack.Packer(use_bin_type=True).pack(payload)
+        r = msgpack.Packer(use_bin_type=True, default=encoder).pack(payload)
         return r
 
     @staticmethod
-    def unpack(blob):
-        unpacker = msgpack.Unpacker(raw=False)
+    def unpack(blob, decoder=None):
+        unpacker = msgpack.Unpacker(raw=False, object_hook=decoder)
         unpacker.feed(blob)
         unpacked_msg = unpacker.unpack()
 
@@ -241,11 +241,13 @@ class Event(object):
 
 
 class Events(ChannelBase):
-    def __init__(self, zmq_socket_type, context=None):
+    def __init__(self, zmq_socket_type, context=None, encoder=None, decoder=None):
         self._debug = False
         self._zmq_socket_type = zmq_socket_type
         self._context = context or Context.get_instance()
         self._socket = self._context.socket(zmq_socket_type)
+        self._encoder = encoder
+        self._decoder = decoder
 
         if zmq_socket_type in (zmq.PUSH, zmq.PUB, zmq.DEALER, zmq.ROUTER):
             self._send = Sender(self._socket)
@@ -342,11 +344,11 @@ class Events(ChannelBase):
             logger.debug('--> %s', event)
         if event.identity:
             parts = list(event.identity or list())
-            parts.extend([b'', event.pack()])
+            parts.extend([b'', event.pack(encoder=self._encoder)])
         elif self._zmq_socket_type in (zmq.DEALER, zmq.ROUTER):
-            parts = (b'', event.pack())
+            parts = (b'', event.pack(encoder=self._encoder))
         else:
-            parts = (event.pack(),)
+            parts = (event.pack(encoder=self._encoder),)
         self._send(parts, timeout)
 
     def recv(self, timeout=None):
@@ -360,7 +362,7 @@ class Events(ChannelBase):
         else:
             identity = None
             blob = parts[0]
-        event = Event.unpack(get_pyzmq_frame_buffer(blob))
+        event = Event.unpack(get_pyzmq_frame_buffer(blob), decoder=self._decoder)
         event.identity = identity
         if self._debug:
             logger.debug('<-- %s', event)

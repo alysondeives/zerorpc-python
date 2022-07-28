@@ -278,8 +278,8 @@ class ClientBase(object):
 class Server(SocketBase, ServerBase):
 
     def __init__(self, methods=None, name=None, context=None, pool_size=1000,
-            heartbeat=5):
-        SocketBase.__init__(self, zmq.ROUTER, context)
+            heartbeat=5, encoder=None, decoder=None):
+        SocketBase.__init__(self, zmq.ROUTER, context, encoder, decoder)
         if methods is None:
             methods = self
 
@@ -296,8 +296,8 @@ class Server(SocketBase, ServerBase):
 class Client(SocketBase, ClientBase):
 
     def __init__(self, connect_to=None, context=None, timeout=30, heartbeat=5,
-            passive_heartbeat=False):
-        SocketBase.__init__(self, zmq.DEALER, context=context)
+            passive_heartbeat=False, encoder=None, decoder=None):
+        SocketBase.__init__(self, zmq.DEALER, context=context, encoder=encoder, decoder=decoder)
         ClientBase.__init__(self, self._events, context, timeout, heartbeat,
                 passive_heartbeat)
         if connect_to:
