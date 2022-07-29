@@ -27,7 +27,7 @@ class ReqRep(object):
 
     def process_call(self, context, channel, req_event, functor):
         context.hook_server_before_exec(req_event)
-        result = functor(*req_event.args)
+        result = functor(*req_event.args, **req_event.kwargs)
         rep_event = channel.new_event(u'OK', (result,),
                 context.hook_get_task_context())
         context.hook_server_after_exec(req_event, rep_event)
@@ -54,7 +54,7 @@ class ReqStream(object):
     def process_call(self, context, channel, req_event, functor):
         context.hook_server_before_exec(req_event)
         xheader = context.hook_get_task_context()
-        for result in iter(functor(*req_event.args)):
+        for result in iter(functor(*req_event.args, **req_event.kwargs)):
             channel.emit(u'STREAM', result, xheader)
         done_event = channel.new_event(u'STREAM_DONE', None, xheader)
         # NOTE: "We" made the choice to call the hook once the stream is done,

@@ -101,10 +101,10 @@ class HeartBeatOnChannel(ChannelBase):
         return LostRemote('Lost remote after {0}s heartbeat'.format(
             self._heartbeat_freq * 2))
 
-    def new_event(self, name, args, header=None):
+    def new_event(self, name, args, kwargs=None, header=None):
         if self._compat_v2 and name == u'_zpc_more':
             name = u'_zpc_hb'
-        return self._channel.new_event(name, args, header)
+        return self._channel.new_event(name, args, kwargs, header)
 
     def emit_event(self, event, timeout=None):
         if self._lost_remote:
