@@ -83,7 +83,7 @@ def test_hook_server_before_exec():
     test_server.stop()
     wait_and_ignore(test_server_task)
 
-def test_hook_server_before_exec_puller():
+def test_hook_server_before_exec_puller_no_middleware():
     zero_ctx = zerorpc.Context()
     trigger = eventlet.event.Event()
     endpoint = random_ipc_endpoint()
@@ -95,13 +95,25 @@ def test_hook_server_before_exec_puller():
     test_client = zerorpc.Pusher()
     test_client.connect(endpoint)
 
-    # Test without a middleware
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    trigger.reset()
 
-    # Test with a middleware
+    test_server.stop()
+    wait_and_ignore(test_server_task)
+
+def test_hook_server_before_exec_puller_with_middleware():
+    zero_ctx = zerorpc.Context()
+    trigger = eventlet.event.Event()
+    endpoint = random_ipc_endpoint()
+
+    echo_module = EchoModule(trigger)
+    test_server = zerorpc.Puller(echo_module, context=zero_ctx)
+    test_server.bind(endpoint)
+    test_server_task = eventlet.spawn(test_server.run)
+    test_client = zerorpc.Pusher()
+    test_client.connect(endpoint)
+
     test_middleware = ServerBeforeExecMiddleware()
     zero_ctx.register_middleware(test_middleware)
     assert test_middleware.called == False
@@ -175,7 +187,7 @@ def test_hook_server_after_exec():
     test_server.stop()
     wait_and_ignore(test_server_task)
     
-def test_hook_server_after_exec_puller():
+def test_hook_server_after_exec_puller_no_middleware():
     zero_ctx = zerorpc.Context()
     trigger = eventlet.event.Event()
     endpoint = random_ipc_endpoint()
@@ -187,13 +199,25 @@ def test_hook_server_after_exec_puller():
     test_client = zerorpc.Pusher()
     test_client.connect(endpoint)
 
-    # Test without a middleware
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    trigger.reset()
 
-    # Test with a middleware
+    test_server.stop()
+    wait_and_ignore(test_server_task)
+
+def test_hook_server_after_exec_puller_with_middleware():
+    zero_ctx = zerorpc.Context()
+    trigger = eventlet.event.Event()
+    endpoint = random_ipc_endpoint()
+
+    echo_module = EchoModule(trigger)
+    test_server = zerorpc.Puller(echo_module, context=zero_ctx)
+    test_server.bind(endpoint)
+    test_server_task = eventlet.spawn(test_server.run)
+    test_client = zerorpc.Pusher()
+    test_client.connect(endpoint)
+
     test_middleware = ServerAfterExecMiddleware()
     zero_ctx.register_middleware(test_middleware)
     assert test_middleware.called == False

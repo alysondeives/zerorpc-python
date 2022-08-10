@@ -340,7 +340,6 @@ def test_task_context_pushpull():
     c = zerorpc.Pusher(context=pusher_ctx)
     c.connect(endpoint)
 
-    trigger.reset()
     c.echo('hello')
     trigger.wait()
 
@@ -378,7 +377,6 @@ def test_task_context_pubsub():
     c = zerorpc.Publisher(context=publisher_ctx)
     c.connect(endpoint)
 
-    trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     while not trigger.ready():
@@ -463,7 +461,6 @@ def test_server_inspect_exception_middleware_puller():
     client = zerorpc.Pusher()
     client.connect(endpoint)
 
-    # barrier.reset()
     client.echo('This is a test which should call the InspectExceptionMiddleware')
     barrier.wait(timeout=TIME_FACTOR * 2)
 
