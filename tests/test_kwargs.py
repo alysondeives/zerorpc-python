@@ -19,12 +19,12 @@ def test_client_connect():
     client = zerorpc.Client()
     client.connect(endpoint)
 
-    args = 1, 2, 3
+    args = [1, 2, 3]
     kwargs = {'a': 7, 'b': 8}
     res = client.echo(*args, **kwargs)
     assert len(res) == 2
     assert res[0] == args
-    assert len(res[1]) == 3
+    assert len(res[1]) == 2
     assert 'a' in res[1] and 'b' in res[1]
 
 def test_client_quick_connect():
@@ -41,10 +41,10 @@ def test_client_quick_connect():
 
     client = zerorpc.Client(endpoint)
 
-    args = 1, 2, 3
+    args = [1, 2, 3]
     kwargs = {'a': 7, 'b': 8}
     res = client.echo(*args, **kwargs)
     assert len(res) == 2
     assert res[0] == args
-    assert len(res[1]) == 3
+    assert len(res[1]) == 2
     assert 'a' in res[1] and 'b' in res[1]

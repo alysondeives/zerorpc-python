@@ -45,6 +45,23 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
+class MessageOptions:
+    def __init__(self, timeout, slots, async_response):
+        self.timeout = timeout
+        self.slots = slots
+        self.async_response = async_response
+    
+    @staticmethod
+    def from_kwargs(kwargs_dict, default_timeout):
+        timeout = kwargs_dict.pop('timeout_', default_timeout)
+        slots = kwargs_dict.pop('slots_', 100)
+        # In python 3.7, "async" is a reserved keyword, clients should now use
+        # "async_": support both for the time being
+        async_ = kwargs_dict.pop('async_', False)
+
+        return MessageOptions(timeout, slots, async_)
+
+
 class ServerBase(object):
 
     def __init__(self, channel, methods=None, name=None, context=None,
@@ -255,25 +272,23 @@ class ClientBase(object):
         if isinstance(method, bytes):
             method = method.decode('utf-8')
 
-        timeout = kwargs.pop('timeout_', self._timeout)
+        opts = MessageOptions.from_kwargs(kwargs, self._timeout)
+        
         channel = self._multiplexer.channel()
         hbchan = HeartBeatOnChannel(channel, freq=self._heartbeat_freq,
                 passive=self._passive_heartbeat)
-        bufchan = BufferedChannel(hbchan, inqueue_size=kwargs.pop('slots_', 100))
+        bufchan = BufferedChannel(hbchan, inqueue_size=opts.slots)
 
         xheader = self._context.hook_get_task_context()
         request_event = bufchan.new_event(method, args, kwargs, xheader)
         self._context.hook_client_before_request(request_event)
         bufchan.emit_event(request_event)
 
-        # In python 3.7, "async" is a reserved keyword, clients should now use
-        # "async_": support both for the time being
-        async_ = kwargs.pop('async_', False)
-        if not async_:
-            return self._process_response(request_event, bufchan, timeout)
+        if not opts.async_response:
+            return self._process_response(request_event, bufchan, opts.timeout)
 
         return eventlet.spawn(self._process_response, request_event, bufchan,
-                timeout)
+                opts.timeout)
 
     def __getattr__(self, method):
         return lambda *args, **kwargs: self(method, *args, **kwargs)
