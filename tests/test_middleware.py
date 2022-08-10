@@ -38,6 +38,7 @@ import hashlib
 import sys
 
 from zerorpc import zmq
+from zerorpc.eventlet_utils import wait_and_ignore
 import zerorpc
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
 
@@ -181,10 +182,7 @@ def test_task_context():
         assert x == 42
 
     srv.stop()
-    try:
-        srv_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(srv_task)
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -237,14 +235,8 @@ def test_task_context_relay():
 
     srv_relay.stop()
     srv.stop()
-    try:
-        srv_relay_task.wait()
-    except greenlet.GreenletExit:
-        pass
-    try:
-        srv_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(srv_relay_task)
+    wait_and_ignore(srv_task)
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -306,15 +298,8 @@ def test_task_context_relay_fork():
 
     srv_relay.stop()
     srv.stop()
-    try:
-        srv_relay_task.wait()
-    except greenlet.GreenletExit:
-        pass
-
-    try:
-        srv_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(srv_relay_task)
+    wait_and_ignore(srv_task)
 
     assert cli_tracer._log == [
             ('new', cli_tracer.trace_id),
@@ -355,15 +340,12 @@ def test_task_context_pushpull():
     c = zerorpc.Pusher(context=pusher_ctx)
     c.connect(endpoint)
 
-    # trigger.reset()
+    trigger.reset()
     c.echo('hello')
     trigger.wait()
 
     puller.stop()
-    try:
-        puller_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(puller_task)
 
     assert pusher_tracer._log == [
             ('new', pusher_tracer.trace_id),
@@ -396,7 +378,7 @@ def test_task_context_pubsub():
     c = zerorpc.Publisher(context=publisher_ctx)
     c.connect(endpoint)
 
-    # trigger.reset()
+    trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     while not trigger.ready():
@@ -405,10 +387,7 @@ def test_task_context_pubsub():
             break
 
     subscriber.stop()
-    try:
-        subscriber_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(subscriber_task)
 
     print(publisher_tracer._log)
     assert ('new', publisher_tracer.trace_id) in publisher_tracer._log

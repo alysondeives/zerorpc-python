@@ -28,6 +28,7 @@ from __future__ import absolute_import
 import eventlet
 
 from zerorpc import zmq
+from zerorpc.eventlet_utils import wait_and_ignore
 from .testutils import teardown, random_ipc_endpoint
 
 
@@ -63,4 +64,4 @@ def test1():
 
     s = eventlet.spawn(server)
     c = eventlet.spawn(client)
-    c.wait()
+    wait_and_ignore(c)

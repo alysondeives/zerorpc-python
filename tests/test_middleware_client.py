@@ -28,6 +28,7 @@ from builtins import range
 import eventlet
 import greenlet
 
+from zerorpc.eventlet_utils import wait_and_ignore
 import zerorpc
 
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -95,10 +96,7 @@ def test_hook_client_before_request():
     assert test_middleware.method == 'echo'
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 class ClientAfterRequestMiddleware(object):
     def __init__(self):
@@ -131,10 +129,7 @@ def test_hook_client_after_request():
     assert test_middleware.retcode == 'OK'
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_after_request_stream():
     zero_ctx = zerorpc.Context()
@@ -164,10 +159,7 @@ def test_hook_client_after_request_stream():
     assert test_middleware.retcode == 'STREAM_DONE'
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_after_request_timeout():
 
@@ -200,10 +192,7 @@ def test_hook_client_after_request_timeout():
         assert "timeout" in ex.args[0]
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 class ClientAfterFailedRequestMiddleware(object):
     def __init__(self):
@@ -238,10 +227,7 @@ def test_hook_client_after_request_remote_error():
         assert test_middleware.called == True
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_after_request_remote_error_stream():
 
@@ -264,10 +250,7 @@ def test_hook_client_after_request_remote_error_stream():
         assert test_middleware.called == True
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_handle_remote_error_inspect():
 
@@ -297,10 +280,7 @@ def test_hook_client_handle_remote_error_inspect():
         assert ex.name == "RuntimeError"
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 # This is a seriously broken idea, but possible nonetheless
 class ClientEvalRemoteErrorMiddleware(object):
@@ -334,10 +314,7 @@ def test_hook_client_handle_remote_error_eval():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_handle_remote_error_eval_stream():
     test_middleware = ClientEvalRemoteErrorMiddleware()
@@ -360,10 +337,7 @@ def test_hook_client_handle_remote_error_eval_stream():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_client_after_request_custom_error():
 
@@ -402,7 +376,4 @@ def test_hook_client_after_request_custom_error():
         assert "BrokenEchoModule" in ex.args[0]
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)

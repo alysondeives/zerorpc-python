@@ -48,7 +48,8 @@ logger = getLogger(__name__)
 class ServerBase(object):
 
     def __init__(self, channel, methods=None, name=None, context=None,
-            pool_size=1000, heartbeat=5):
+            # TODO: need to decide on an appropriate pool size here
+            pool_size=100000, heartbeat=5):
         self._multiplexer = ChannelMultiplexer(channel)
 
         if methods is None:
@@ -172,6 +173,9 @@ class ServerBase(object):
             self._acceptor_task.wait()
         finally:
             self.stop()
+            # TODO: this was self._task_pool.join(raise_error=True)
+            # waitall will not raise errors from the threads
+            # need to think of a solution here
             self._task_pool.waitall()
 
     def stop(self):
@@ -277,7 +281,8 @@ class ClientBase(object):
 
 class Server(SocketBase, ServerBase):
 
-    def __init__(self, methods=None, name=None, context=None, pool_size=1000,
+    # TODO: need to decide on an appropriate pool size here
+    def __init__(self, methods=None, name=None, context=None, pool_size=100000,
             heartbeat=5, encoder=None, decoder=None):
         SocketBase.__init__(self, zmq.ROUTER, context, encoder, decoder)
         if methods is None:

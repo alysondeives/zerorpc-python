@@ -50,7 +50,7 @@ def test_pushpull_inheritance():
     puller.connect(endpoint)
     eventlet.spawn(puller.run)
 
-    # trigger.reset()
+    trigger.reset()
     pusher.lolita(1, 2)
     trigger.wait()
     print('done')
@@ -73,7 +73,7 @@ def test_pubsub_inheritance():
     subscriber.connect(endpoint)
     eventlet.spawn(subscriber.run)
 
-    # trigger.reset()
+    trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     for attempt in range(0, 10):
@@ -102,7 +102,7 @@ def test_pushpull_composite():
     puller.connect(endpoint)
     eventlet.spawn(puller.run)
 
-    # trigger.reset()
+    trigger.reset()
     pusher.lolita(1, 2)
     trigger.wait()
     print('done')
@@ -126,7 +126,7 @@ def test_pubsub_composite():
     subscriber.connect(endpoint)
     eventlet.spawn(subscriber.run)
 
-    # trigger.reset()
+    trigger.reset()
     # We need this retry logic to wait that the subscriber.run coroutine starts
     # reading (the published messages will go to /dev/null until then).
     for attempt in range(0, 10):

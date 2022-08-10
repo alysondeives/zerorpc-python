@@ -28,6 +28,7 @@ from builtins import range
 import eventlet
 import greenlet
 
+from zerorpc.eventlet_utils import wait_and_ignore
 import zerorpc
 
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
@@ -80,10 +81,7 @@ def test_hook_server_before_exec():
     assert test_middleware.called == True
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_server_before_exec_puller():
     zero_ctx = zerorpc.Context()
@@ -101,7 +99,7 @@ def test_hook_server_before_exec_puller():
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    # trigger.reset()
+    trigger.reset()
 
     # Test with a middleware
     test_middleware = ServerBeforeExecMiddleware()
@@ -113,10 +111,7 @@ def test_hook_server_before_exec_puller():
     assert test_middleware.called == True
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_server_before_exec_stream():
     zero_ctx = zerorpc.Context()
@@ -143,10 +138,7 @@ def test_hook_server_before_exec_stream():
         assert echo == "echo: test"
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 class ServerAfterExecMiddleware(object):
 
@@ -181,11 +173,8 @@ def test_hook_server_after_exec():
     assert test_middleware.reply_event_name == 'OK'
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
-
+    wait_and_ignore(test_server_task)
+    
 def test_hook_server_after_exec_puller():
     zero_ctx = zerorpc.Context()
     trigger = eventlet.event.Event()
@@ -202,7 +191,7 @@ def test_hook_server_after_exec_puller():
     test_client.echo("test")
     trigger.wait(timeout=TIME_FACTOR * 2)
     assert echo_module.last_msg == "echo: test"
-    # trigger.reset()
+    trigger.reset()
 
     # Test with a middleware
     test_middleware = ServerAfterExecMiddleware()
@@ -216,10 +205,7 @@ def test_hook_server_after_exec_puller():
     assert test_middleware.reply_event_name is None
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_server_after_exec_stream():
     zero_ctx = zerorpc.Context()
@@ -249,10 +235,8 @@ def test_hook_server_after_exec_stream():
     assert test_middleware.reply_event_name == 'STREAM_DONE'
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
+
 
 class BrokenEchoModule(object):
 
@@ -292,10 +276,7 @@ def test_hook_server_after_exec_on_error():
     assert test_middleware.called == False
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_server_after_exec_on_error_puller():
     zero_ctx = zerorpc.Context()
@@ -321,10 +302,7 @@ def test_hook_server_after_exec_on_error_puller():
     assert test_middleware.called == False
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)
 
 def test_hook_server_after_exec_on_error_stream():
     zero_ctx = zerorpc.Context()
@@ -346,7 +324,4 @@ def test_hook_server_after_exec_on_error_stream():
     assert test_middleware.called == False
 
     test_server.stop()
-    try:
-        test_server_task.wait()
-    except greenlet.GreenletExit:
-        pass
+    wait_and_ignore(test_server_task)

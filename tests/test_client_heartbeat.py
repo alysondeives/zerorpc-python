@@ -32,6 +32,7 @@ import eventlet
 
 import zerorpc
 from .testutils import teardown, random_ipc_endpoint, TIME_FACTOR
+from zerorpc.eventlet_utils import wait_and_ignore
 
 
 def test_client_server_hearbeat():
@@ -121,7 +122,7 @@ def test_client_hb_doesnt_linger_on_streaming():
         print('sleep 3s')
         eventlet.sleep(TIME_FACTOR * 3)
 
-    eventlet.spawn(test_client).wait()
+    wait_and_ignore(eventlet.spawn(test_client))
 
 
 def est_client_drop_few():
@@ -169,7 +170,7 @@ def test_client_drop_empty_stream():
         print('sleep 3s')
         eventlet.sleep(TIME_FACTOR * 3)
 
-    eventlet.spawn(test_client).wait()
+    wait_and_ignore(eventlet.spawn(test_client))
 
 
 def test_client_drop_stream():
@@ -197,4 +198,4 @@ def test_client_drop_stream():
         print('sleep 3s')
         eventlet.sleep(TIME_FACTOR * 3)
 
-    eventlet.spawn(test_client).wait()
+    wait_and_ignore(eventlet.spawn(test_client))
