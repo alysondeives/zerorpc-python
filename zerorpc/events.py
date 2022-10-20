@@ -252,6 +252,7 @@ class Events(ChannelBase):
         self._zmq_socket_type = zmq_socket_type
         self._context = context or Context.get_instance()
         self._socket = self._context.socket(zmq_socket_type)
+        self._socket.setsockopt(zmq.IPV6, True)
         self._encoder = encoder
         self._decoder = decoder
 
