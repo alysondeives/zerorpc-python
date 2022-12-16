@@ -86,7 +86,7 @@ class ChannelMultiplexer(ChannelBase):
                 queue = self._broadcast_queue
 
             if queue is None:
-                logger.warning('zerorpc.ChannelMultiplexer,'
+                logger.debug('zerorpc.ChannelMultiplexer,'
                         ' unable to route event: {0}'.format(
                             event.__str__(ignore_args=True)))
             else:
